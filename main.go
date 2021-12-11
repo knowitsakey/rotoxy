@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"github.com/gtuk/rotating-tor-proxy/core"
@@ -8,12 +9,14 @@ import (
 	"golang.org/x/sync/errgroup"
 	"log"
 	"os"
+	"strconv"
 )
 
 func main() {
 	var numberTorInstances int
 	var port int
 	var circuitInterval int
+	var hslist string
 
 	app := &cli.App{
 		Name:  "rotoxy",
@@ -37,9 +40,15 @@ func main() {
 				Usage:       "number in seconds after a new circuit should be requested",
 				Destination: &circuitInterval,
 			},
+			&cli.StringFlag{
+				Name:        "hslist",
+				Value:       "onionservices.txt",
+				Usage:       "number in seconds after a new circuit should be requested",
+				Destination: &hslist,
+			},
 		},
 		Action: func(c *cli.Context) error {
-			return run(port, numberTorInstances, circuitInterval)
+			return run(port, numberTorInstances, circuitInterval, hslist)
 		},
 	}
 
@@ -48,18 +57,43 @@ func main() {
 		log.Fatal(err)
 	}
 }
+func readtodict(filename string, txtlines *[]string) {
 
-func run(port int, numberTorInstances int, circuitInterval int) error {
+	file, err := os.Open(filename)
+
+	if err != nil {
+		log.Fatalf("failed opening file: %s", err)
+	}
+
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	//var txtlines []string
+
+	for scanner.Scan() {
+		*txtlines = append(*txtlines, scanner.Text())
+	}
+
+	file.Close()
+
+}
+func run(port int, numberTorInstances int, circuitInterval int, hslist string) error {
 	log.Println(fmt.Sprintf("Starting tor proxies"))
 
 	proxies := make([]core.TorProxy, 0)
 	ch := make(chan core.TorProxy, numberTorInstances)
 
 	g, _ := errgroup.WithContext(context.Background())
-
-	for i := 1; i <= numberTorInstances; i++ {
+	var txtlines []string
+	readtodict(hslist, &txtlines)
+	for _, eachline := range txtlines {
+		fmt.Println(eachline)
+	}
+	//	for i := 1; i <= numberTorInstances; i++ {
+	i := 1
+	for _, hsaddr := range txtlines {
 		g.Go(func() error {
-			torProxy, err := core.CreateTorProxy(circuitInterval)
+			fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + hsaddr)
+			torProxy, err := core.CreateTorProxy(circuitInterval, hsaddr)
 			if err != nil {
 				if torProxy != nil {
 					torProxy.Close()
@@ -69,7 +103,7 @@ func run(port int, numberTorInstances int, circuitInterval int) error {
 			}
 
 			ch <- *torProxy
-
+			i++
 			return nil
 		})
 	}

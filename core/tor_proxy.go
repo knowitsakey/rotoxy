@@ -13,7 +13,7 @@ type TorProxy struct {
 	CircuitInterval *int
 }
 
-func CreateTorProxy(circuitInterval int) (*TorProxy, error) {
+func CreateTorProxy(circuitInterval int, hsaddr string) (*TorProxy, error) {
 	ctx := context.Background()
 
 	port, err := GetFreePort()
@@ -43,9 +43,12 @@ func CreateTorProxy(circuitInterval int) (*TorProxy, error) {
 	torProxy.ProxyPort = &port
 	torProxy.ControlPort = &torCtx.ControlPort
 	torProxy.CircuitInterval = &circuitInterval
+	conf1 := &tor.DialConf{}
+	conf1.ProxyAddress = hsaddr
+	//	conf1.ProxyAddress = "fefix3iwkb5b3b2z2sicik7re2qsv2o5hrch7pyvuvifklou2fnblayd.onion"
 
 	// Make connection
-	_, err = torCtx.Dialer(ctx, nil)
+	_, err = torCtx.Dialer(ctx, conf1)
 	if err != nil {
 		return nil, err
 	}
