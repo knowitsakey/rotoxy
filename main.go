@@ -48,7 +48,7 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return run(port, numberTorInstances, circuitInterval, hslist)
+			return run(port, circuitInterval, hslist)
 		},
 	}
 
@@ -76,37 +76,42 @@ func readtodict(filename string, txtlines *[]string) {
 	file.Close()
 
 }
-func run(port int, numberTorInstances int, circuitInterval int, hslist string) error {
+func run(port int, circuitInterval int, hslist string) error {
+
+	var txtlines []string
+	readtodict(hslist, &txtlines)
+	numberTorInstances := len(txtlines)
+
 	log.Println(fmt.Sprintf("Starting tor proxies"))
 
 	proxies := make([]core.TorProxy, 0)
 	ch := make(chan core.TorProxy, numberTorInstances)
 
 	g, _ := errgroup.WithContext(context.Background())
-	var txtlines []string
-	readtodict(hslist, &txtlines)
+
 	for _, eachline := range txtlines {
 		fmt.Println(eachline)
 	}
-	//	for i := 1; i <= numberTorInstances; i++ {
-	i := 1
-	for _, hsaddr := range txtlines {
-		g.Go(func() error {
-			fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + hsaddr)
-			torProxy, err := core.CreateTorProxy(circuitInterval, hsaddr)
-			if err != nil {
-				if torProxy != nil {
-					torProxy.Close()
-				}
 
-				return err
+	for i := 0; i < numberTorInstances; i++ {
+		//i := 1
+		//for _, hsaddr := range txtlines {
+		//		g.Go(func() error {
+		fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
+		torProxy, err := core.CreateTorProxy(circuitInterval, txtlines[i])
+		if err != nil {
+			if torProxy != nil {
+				torProxy.Close()
 			}
 
-			ch <- *torProxy
-			i++
-			return nil
-		})
+			return err
+		}
+
+		ch <- *torProxy
+
+		//		})
 	}
+	//return nil
 
 	err := g.Wait()
 	close(ch)
