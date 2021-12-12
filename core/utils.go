@@ -24,3 +24,9 @@ func CloseProxies(proxies []TorProxy) {
 		proxy.Close()
 	}
 }
+func CloseProxies1(proxies []TorProxy1) {
+	for _, proxy := range proxies {
+		log.Println("Cleanup proxy")
+		proxy.Close1()
+	}
+}

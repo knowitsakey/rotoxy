@@ -48,7 +48,8 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return run(port, circuitInterval, hslist)
+			//return run(port, circuitInterval, hslist)
+			return dash(port, circuitInterval, hslist)
 		},
 	}
 
@@ -128,8 +129,72 @@ func run(port int, circuitInterval int, hslist string) error {
 	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
 	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
 
-	reverseProxy := &core.ReverseProxy{}
-	err = reverseProxy.Start(proxies, port)
+	proxies1 := make([]core.TorProxy, 0)
+
+	reverseProxy1 := &core.ReverseProxy{}
+	err = reverseProxy1.Start(proxies1, port)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func dash(port int, circuitInterval int, hslist string) error {
+
+	var txtlines []string
+	readtodict(hslist, &txtlines)
+	numberTorInstances := len(txtlines)
+
+	log.Println(fmt.Sprintf("Starting tor proxies"))
+
+	proxies := make([]core.TorProxy1, 0)
+	ch := make(chan core.TorProxy1, numberTorInstances)
+
+	g, _ := errgroup.WithContext(context.Background())
+
+	for _, eachline := range txtlines {
+		fmt.Println(eachline)
+	}
+
+	for i := 0; i < numberTorInstances; i++ {
+		//i := 1
+		//for _, hsaddr := range txtlines {
+		//		g.Go(func() error {
+		fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
+		torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
+		if err != nil {
+			if torProxy != nil {
+				torProxy.Close1()
+			}
+
+			return err
+		}
+
+		ch <- *torProxy
+
+		//		})
+	}
+	//return nil
+
+	err := g.Wait()
+	close(ch)
+
+	for proxy := range ch {
+		proxies = append(proxies, proxy)
+	}
+	defer core.CloseProxies1(proxies)
+
+	if err != nil {
+		return err
+	}
+
+	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
+	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
+
+	proxies1 := make([]core.TorProxy1, 0)
+
+	reverseProxy1 := &core.ReverseProxy1{}
+	err = reverseProxy1.Start1(proxies1, port)
 	if err != nil {
 		return err
 	}

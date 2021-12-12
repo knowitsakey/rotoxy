@@ -16,11 +16,56 @@ type ReverseProxy struct {
 	upstreamProxies *[]TorProxy
 }
 
+type ReverseProxy1 struct {
+	port            *int
+	proxy           *goproxy.ProxyHttpServer
+	upstreamProxies *[]TorProxy1
+}
+
 type upstreamDialer struct {
 	forwardDialers []socks.Dialer
 }
 
 func (m *ReverseProxy) Start(proxies []TorProxy, port int) error {
+	m.port = &port
+	m.upstreamProxies = &proxies
+
+	var router socks.Dialer
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.Tr.DisableKeepAlives = true
+
+	proxyUrls := make([]string, 0)
+	for _, proxy := range proxies {
+		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", *proxy.ProxyPort))
+	}
+
+	router, err := buildUpstreamRouter(proxyUrls)
+	if err != nil {
+		return err
+	}
+
+	proxy.ConnectDial = func(network, address string) (net.Conn, error) {
+		return router.Dial(network, address)
+	}
+	proxy.Tr.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return router.Dial(network, address)
+	}
+
+	m.proxy = proxy
+
+	httpListen, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+
+	err = http.Serve(httpListen, proxy)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func (m *ReverseProxy1) Start1(proxies []TorProxy1, port int) error {
 	m.port = &port
 	m.upstreamProxies = &proxies
 
