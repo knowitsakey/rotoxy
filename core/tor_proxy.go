@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -99,7 +100,7 @@ func readFully(conn net.Conn) ([]byte, error) {
 	}
 	return result.Bytes(), nil
 }
-func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
+func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*TorProxy1, error) {
 	ctx := context.Background()
 
 	port, err := GetFreePort()
@@ -164,7 +165,7 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	client1 := ssh.NewClient(c, chans, reqs)
 	fmt.Println("Connected to .onion successfully!")
 
-	defer client1.Close()
+	//defer client1.Close()
 
 	fmt.Println("connected to ssh server")
 	fmt.Println("we trine kreate socks serva at"+socks5Address, err)
@@ -189,6 +190,7 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 		return nil, err
 	}
 	//	torProxy.
+	wg.Done()
 	return torProxy1, nil
 }
 

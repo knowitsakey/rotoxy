@@ -105,6 +105,46 @@ func (m *ReverseProxy1) Start1(proxies []TorProxy1, port int) error {
 	return nil
 }
 
+func (m *ReverseProxy1) Start2(proxies []int, port int) error {
+	m.port = &port
+	//m.upstreamProxies = &proxies
+
+	var router socks.Dialer
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.Tr.DisableKeepAlives = true
+
+	proxyUrls := make([]string, 0)
+	for _, proxy := range proxies {
+		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", proxy))
+	}
+
+	router, err := buildUpstreamRouter(proxyUrls)
+	if err != nil {
+		return err
+	}
+
+	proxy.ConnectDial = func(network, address string) (net.Conn, error) {
+		return router.Dial(network, address)
+	}
+	proxy.Tr.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return router.Dial(network, address)
+	}
+
+	m.proxy = proxy
+
+	httpListen, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+
+	err = http.Serve(httpListen, proxy)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func newUpstreamDialer(forwardDialers []socks.Dialer) *upstreamDialer {
 	return &upstreamDialer{
 		forwardDialers: forwardDialers,

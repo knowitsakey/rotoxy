@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 )
 
 func main() {
@@ -149,56 +150,63 @@ func dash(port int, circuitInterval int, hslist string) error {
 	log.Println(fmt.Sprintf("Starting tor proxies"))
 
 	proxies := make([]core.TorProxy1, 0)
-	ch := make(chan core.TorProxy1, numberTorInstances)
+	//ch := make(chan core.TorProxy1, numberTorInstances)
+	var proxyports []int
+	//proxies1 = []int{9002, 9008}
 
-	g, _ := errgroup.WithContext(context.Background())
+	//g, _ := errgroup.WithContext(context.Background())
 
 	for _, eachline := range txtlines {
 		fmt.Println(eachline)
 	}
-
+	var wg sync.WaitGroup
+	wg.Add(numberTorInstances)
 	for i := 0; i < numberTorInstances; i++ {
 		//i := 1
 		//for _, hsaddr := range txtlines {
 		go func(i int) {
 			fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
-			torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
+			torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i], wg)
 			if err != nil {
 				if torProxy != nil {
 					torProxy.Close1()
 				}
 
 			}
+			port1 := torProxy.DoubleProxyPort
+			proxyports = append(proxyports, *port1)
 
-			ch <- *torProxy
+			//ch <- *torProxy
 
 		}(i)
 	}
 	//return nil
 
-	err := g.Wait()
-	close(ch)
+	wg.Wait()
+	/*	close(ch)
 
-	for proxy := range ch {
-		proxies = append(proxies, proxy)
-	}
-	defer core.CloseProxies1(proxies)
+		for proxy := range ch {
+			proxies = append(proxies, proxy)
+		}
 
-	if err != nil {
-		return err
-	}
 
-	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
-	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
+		if err != nil {
+			return err
+		}
 
-	proxies1 := make([]core.TorProxy1, 0)
+		log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
+		log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
+
+		proxies1 := make([]core.TorProxy1, 0)
+	*/
 
 	reverseProxy1 := &core.ReverseProxy1{}
 
-	err = reverseProxy1.Start1(proxies1, port)
+	err := reverseProxy1.Start2(proxyports, port)
 	if err != nil {
 		return err
 	}
+	defer core.CloseProxies1(proxies)
 	return err
 }
 
