@@ -160,20 +160,19 @@ func dash(port int, circuitInterval int, hslist string) error {
 	for i := 0; i < numberTorInstances; i++ {
 		//i := 1
 		//for _, hsaddr := range txtlines {
-		//		g.Go(func() error {
-		fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
-		torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
-		if err != nil {
-			if torProxy != nil {
-				torProxy.Close1()
+		go func(i int) {
+			fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
+			torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
+			if err != nil {
+				if torProxy != nil {
+					torProxy.Close1()
+				}
+
 			}
 
-			return err
-		}
+			ch <- *torProxy
 
-		ch <- *torProxy
-
-		//		})
+		}(i)
 	}
 	//return nil
 

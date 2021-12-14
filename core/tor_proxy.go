@@ -107,17 +107,17 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 		return nil, err
 	}
 
-	//var extraArgs []string
+	var extraArgs []string
 	// Set socks port
-	//extraArgs = append(extraArgs, "--SocksPort")
-	//extraArgs = append(extraArgs, strconv.Itoa(port))
+	extraArgs = append(extraArgs, "--SocksPort")
+	extraArgs = append(extraArgs, strconv.Itoa(port))
 
 	// Set new circuit interval after circuit was used once
-	//extraArgs = append(extraArgs, "--MaxCircuitDirtiness")
-	//extraArgs = append(extraArgs, strconv.Itoa(circuitInterval))
+	extraArgs = append(extraArgs, "--MaxCircuitDirtiness")
+	extraArgs = append(extraArgs, strconv.Itoa(circuitInterval))
 
 	torCtx, err := tor.Start(ctx, &tor.StartConf{
-		//ExtraArgs: extraArgs,
+		ExtraArgs: extraArgs,
 		//NoAutoSocksPort: true,
 		EnableNetwork: true,
 	})
@@ -132,8 +132,8 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	torProxy1.CircuitInterval = &circuitInterval
 	conf1 := &tor.DialConf{}
 
-	//conf1.ProxyAddress = "127.0.0.1:" + strconv.Itoa(*torProxy1.ProxyPort)
-	conf1.ProxyAddress = "127.0.0.1:9050"
+	conf1.ProxyAddress = "127.0.0.1:" + strconv.Itoa(*torProxy1.ProxyPort)
+	//conf1.ProxyAddress = "127.0.0.1:9050"
 	conf1.Forward = proxy.Direct
 	doubleproxyport, err := GetFreePort()
 	torProxy1.DoubleProxyPort = &doubleproxyport
@@ -150,8 +150,9 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn1, err := tp.DialTor(hsaddr)
-
+	conn1, err := tp.DialTor(hsaddr + ":22")
+	//d, err := torCtx.Dialer(ctx, conf1)
+	//conn1, err := d.DialContext(ctx, "tcp", hsaddr)
 	if err != nil {
 		return nil, err
 	}
@@ -166,24 +167,23 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	defer client1.Close()
 
 	fmt.Println("connected to ssh server")
+	fmt.Println("we trine kreate socks serva at"+socks5Address, err)
+	conf := &socks5.Config{
+		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return client1.Dial(network, addr)
+		},
+	}
 
-	go func() {
-		conf := &socks5.Config{
-			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return client1.Dial(network, addr)
-			},
-		}
+	serverSocks, err := socks5.New(conf)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
 
-		serverSocks, err := socks5.New(conf)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		if err := serverSocks.ListenAndServe("tcp", socks5Address); err != nil {
-			fmt.Println("failed to create socks5 server", err)
-		}
-	}()
+	if err := serverSocks.ListenAndServe("tcp", socks5Address); err != nil {
+		fmt.Println("failed to create socks5 server", err)
+	}
+	fmt.Println("kreated u a socks serva at "+socks5Address, err)
 
 	if err != nil {
 		return nil, err
