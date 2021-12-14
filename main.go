@@ -2,13 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"github.com/gtuk/rotating-tor-proxy/core"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"os"
 	"strconv"
-	"sync"
 )
 
 func main() {
@@ -86,62 +87,67 @@ func dash(port int, circuitInterval int, hslist string) error {
 	log.Println(fmt.Sprintf("Starting tor proxies"))
 
 	proxies := make([]core.TorProxy1, 0)
-	//ch := make(chan core.TorProxy1, numberTorInstances)
-	var proxyports []int
+	ch := make(chan core.TorProxy1, numberTorInstances)
+	//var proxyports []int
 	//proxies1 = []int{9002, 9008}
 
-	//g, _ := errgroup.WithContext(context.Background())
+	g, _ := errgroup.WithContext(context.Background())
 
 	for _, eachline := range txtlines {
 		fmt.Println(eachline)
 	}
-	var wg sync.WaitGroup
-	wg.Add(numberTorInstances)
-	for i := 0; i < numberTorInstances; i++ {
+	//var wg sync.WaitGroup
+	//err := wg.Add(numberTorInstances)
+	for i := 0; i < numberTorInstances-1; i++ {
 		//i := 1
 		//for _, hsaddr := range txtlines {
-		go func(i int) {
+		//go func(i int) {
+		g.Go(func() error {
 			fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
-			torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i], wg)
+			torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
 			if err != nil {
 				if torProxy != nil {
 					torProxy.Close1()
 				}
-
+				return err
 			}
-			port1 := torProxy.DoubleProxyPort
-			proxyports = append(proxyports, *port1)
+			//port1 := torProxy.DoubleProxyPort
+			//proxyports = append(proxyports, *port1)
 
-			//ch <- *torProxy
-
-		}(i)
+			ch <- *torProxy
+			return nil
+			//}(i)
+		})
+	}
+	err := g.Wait()
+	close(ch)
+	for proxy := range ch {
+		proxies = append(proxies, proxy)
 	}
 	//return nil
-
-	wg.Wait()
-	/*	close(ch)
-
-		for proxy := range ch {
-			proxies = append(proxies, proxy)
+	/*	if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
+			fmt.Println("failed to create socks5 server", err)
 		}
-
+		fmt.Println("kreated u a socks serva at "+socks5Address, err)
 
 		if err != nil {
-			return err
-		}
+			return nil, err
+		}*/
+	defer core.CloseProxies1(proxies)
 
-		log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
-		log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
-
-		proxies1 := make([]core.TorProxy1, 0)
-	*/
-
-	reverseProxy1 := &core.ReverseProxy1{}
-
-	err := reverseProxy1.Start2(proxyports, port)
 	if err != nil {
 		return err
 	}
-	defer core.CloseProxies1(proxies)
+
+	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
+	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
+
+	reverseProxy1 := &core.ReverseProxy1{}
+
+	err = reverseProxy1.Start2(proxies, port)
+	if err != nil {
+		return err
+	}
+
 	return err
 }

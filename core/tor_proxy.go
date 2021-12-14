@@ -13,7 +13,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -26,6 +25,8 @@ type TorProxy struct {
 
 type TorProxy1 struct {
 	Ctx             *tor.Tor
+	client          *ssh.Client
+	socks5s         *socks5.Server
 	ControlPort     *int
 	ProxyPort       *int
 	CircuitInterval *int
@@ -33,7 +34,7 @@ type TorProxy1 struct {
 	//Onionproxy      *socks5.Server
 }
 
-func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*TorProxy1, error) {
+func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	ctx := context.Background()
 
 	port, err := GetFreePort()
@@ -94,8 +95,10 @@ func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*To
 	if err != nil {
 		return nil, err
 	}
-
-	client1 := ssh.NewClient(c, chans, reqs)
+	//torProxy1.client, err := &ssh.NewClient(c, chans, reqs)
+	//client1 := &ssh.NewClient(c, chans, reqs
+	torProxy1.client = ssh.NewClient(c, chans, reqs)
+	//client1 := ssh.NewClient(c, chans, reqs)
 	fmt.Println("Connected to .onion successfully!")
 
 	//defer client1.Close()
@@ -104,17 +107,17 @@ func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*To
 	fmt.Println("we trine kreate socks serva at"+socks5Address, err)
 	conf := &socks5.Config{
 		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return client1.Dial(network, addr)
+			return torProxy1.client.Dial(network, addr)
 		},
 	}
 
-	serverSocks, err := socks5.New(conf)
+	torProxy1.socks5s, err = socks5.New(conf)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
 
-	if err := serverSocks.ListenAndServe("tcp", socks5Address); err != nil {
+	if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
 		fmt.Println("failed to create socks5 server", err)
 	}
 	fmt.Println("kreated u a socks serva at "+socks5Address, err)
@@ -123,7 +126,6 @@ func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*To
 		return nil, err
 	}
 	//	torProxy.
-	wg.Done()
 	return torProxy1, nil
 }
 
