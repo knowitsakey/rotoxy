@@ -75,7 +75,7 @@ func (m *ReverseProxy1) Start1(proxies []TorProxy1, port int) error {
 
 	proxyUrls := make([]string, 0)
 	for _, proxy := range proxies {
-		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", *proxy.ProxyPort))
+		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", *proxy.DoubleProxyPort))
 	}
 
 	router, err := buildUpstreamRouter(proxyUrls)

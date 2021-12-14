@@ -5,14 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/armon/go-socks5"
 	"github.com/cretz/bine/tor"
-	"net"
-	"strconv"
-	"time"
-
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
 	"io"
+	"net"
 	"os"
+	"strconv"
+	"time"
 )
 
 type TorProxy struct {
@@ -52,6 +53,7 @@ func CreateTorProxy(circuitInterval int, hsaddr string) (*TorProxy, error) {
 		ExtraArgs:       extraArgs,
 		NoAutoSocksPort: true,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -105,18 +107,19 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 		return nil, err
 	}
 
-	var extraArgs []string
+	//var extraArgs []string
 	// Set socks port
-	extraArgs = append(extraArgs, "--SocksPort")
-	extraArgs = append(extraArgs, strconv.Itoa(port))
+	//extraArgs = append(extraArgs, "--SocksPort")
+	//extraArgs = append(extraArgs, strconv.Itoa(port))
 
 	// Set new circuit interval after circuit was used once
-	extraArgs = append(extraArgs, "--MaxCircuitDirtiness")
-	extraArgs = append(extraArgs, strconv.Itoa(circuitInterval))
+	//extraArgs = append(extraArgs, "--MaxCircuitDirtiness")
+	//extraArgs = append(extraArgs, strconv.Itoa(circuitInterval))
 
 	torCtx, err := tor.Start(ctx, &tor.StartConf{
-		ExtraArgs:       extraArgs,
-		NoAutoSocksPort: true,
+		//ExtraArgs: extraArgs,
+		//NoAutoSocksPort: true,
+		EnableNetwork: true,
 	})
 	if err != nil {
 		return nil, err
@@ -128,63 +131,59 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	torProxy1.ControlPort = &torCtx.ControlPort
 	torProxy1.CircuitInterval = &circuitInterval
 	conf1 := &tor.DialConf{}
-	conf1.ProxyAddress = hsaddr
-	conf1.ProxyAddress = "fefix3iwkb5b3b2z2sicik7re2qsv2o5hrch7pyvuvifklou2fnblayd.onion:80"
+
+	//conf1.ProxyAddress = "127.0.0.1:" + strconv.Itoa(*torProxy1.ProxyPort)
+	conf1.ProxyAddress = "127.0.0.1:9050"
 	conf1.Forward = proxy.Direct
-	// Make connection
-	//_, err = torCtx.Dialer(ctx, conf1)
-	myport := 10000
-	//here you need to create a socks 5 proxy listening on 127.0.0.1:myport, by connecting to a hidden service
-	//R socks5 proxy object, listening at myport
-	//M the torproxy1 struct
-	//E what should socksproxy object be: a dialler or a proxyobhect?
+	doubleproxyport, err := GetFreePort()
+	torProxy1.DoubleProxyPort = &doubleproxyport
+	socks5Address := "127.0.0.1:" + strconv.Itoa(*torProxy1.DoubleProxyPort)
 
-	tp, err := NewTorGate("127.0.0.1:9050")
-	//gw := "127.0.0.1:" + strconv.Itoa(port)
-	//tp, err := NewTorGate(gw)
-	conn1, err := tp.DialTor(conf1.ProxyAddress)
+	sshConf := &ssh.ClientConfig{
+		User:            "based",
+		Auth:            []ssh.AuthMethod{ssh.Password("lab")},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
 
-	_, err = conn1.Write([]byte("HEAD / HTTP/1.0\r\n\r\n"))
-	checkError(err)
+	tp, err := NewTorGate(conf1.ProxyAddress)
 
-	result, err := readFully(conn1)
-	checkError(err)
-	fmt.Println(string(result))
 	if err != nil {
-		fmt.Println("Maybe yoshit is not listening. Error was: " + err.Error())
-		fmt.Println(err.Error())
 		return nil, err
 	}
+	conn1, err := tp.DialTor(hsaddr)
+
+	if err != nil {
+		return nil, err
+	}
+	c, chans, reqs, err := ssh.NewClientConn(conn1, conf1.ProxyAddress, sshConf)
+	if err != nil {
+		return nil, err
+	}
+
+	client1 := ssh.NewClient(c, chans, reqs)
 	fmt.Println("Connected to .onion successfully!")
 
+	defer client1.Close()
 
+	fmt.Println("connected to ssh server")
 
-	//dialer2, err := proxy.SOCKS5("tcp", "fefix3iwkb5b3b2z2sicik7re2qsv2o5hrch7pyvuvifklou2fnblayd.onion:80", nil, dialer1)
-	//myconn := dialer2.Dial("tcp", "https://startpage.com")
+	go func() {
+		conf := &socks5.Config{
+			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return client1.Dial(network, addr)
+			},
+		}
 
-	/*transport := &http.Transport{
-		Proxy:               nil,
-		Dial:                dialer2.Dial,
-		TLSHandshakeTimeout: 30 * time.Second,
-	}
+		serverSocks, err := socks5.New(conf)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 
-	client := http.Client{Transport: &http.Transport{Dial: conn1.Dial}}
-	httpClient := &http.Client{Transport: transport} // Get /
-	resp, err := httpClient.Get("https://check.torproject.org")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	// Grab the <title>
-	parsed, err := html.Parse(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	//fmt.Printf("Title: %v\n", getTitle(parsed))
-	//fmt.Printf(parsed)
-	fmt.Print(parsed)
-	*/
-	torProxy1.DoubleProxyPort = &myport
+		if err := serverSocks.ListenAndServe("tcp", socks5Address); err != nil {
+			fmt.Println("failed to create socks5 server", err)
+		}
+	}()
 
 	if err != nil {
 		return nil, err
@@ -254,13 +253,6 @@ func (gate *TorGate) DialTor(address string) (net.Conn, error) {
 		return nil, errors.New("Failed to connect: " + err.Error())
 	}
 
-
-
-	
-
-
 	return connect, nil
-
-
 
 }

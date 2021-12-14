@@ -139,6 +139,7 @@ func run(port int, circuitInterval int, hslist string) error {
 
 	return nil
 }
+
 func dash(port int, circuitInterval int, hslist string) error {
 
 	var txtlines []string
@@ -194,10 +195,21 @@ func dash(port int, circuitInterval int, hslist string) error {
 	proxies1 := make([]core.TorProxy1, 0)
 
 	reverseProxy1 := &core.ReverseProxy1{}
+
 	err = reverseProxy1.Start1(proxies1, port)
 	if err != nil {
 		return err
 	}
-
-	return nil
+	return err
 }
+
+/*
+func dash1(port int, circuitInterval int, hslist string) error {
+	reverseProxy1 := &core.ReverseProxy1{}
+	var proxies1 []int
+	proxies1 = []int{9002, 9008}
+	err := reverseProxy1.Start1(proxies1, port)
+
+	return err
+}
+*/
