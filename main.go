@@ -2,11 +2,9 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"github.com/gtuk/rotating-tor-proxy/core"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"os"
 	"strconv"
@@ -78,68 +76,6 @@ func readtodict(filename string, txtlines *[]string) {
 	file.Close()
 
 }
-func run(port int, circuitInterval int, hslist string) error {
-
-	var txtlines []string
-	readtodict(hslist, &txtlines)
-	numberTorInstances := len(txtlines)
-
-	log.Println(fmt.Sprintf("Starting tor proxies"))
-
-	proxies := make([]core.TorProxy, 0)
-	ch := make(chan core.TorProxy, numberTorInstances)
-
-	g, _ := errgroup.WithContext(context.Background())
-
-	for _, eachline := range txtlines {
-		fmt.Println(eachline)
-	}
-
-	for i := 0; i < numberTorInstances; i++ {
-		//i := 1
-		//for _, hsaddr := range txtlines {
-		//		g.Go(func() error {
-		fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
-		torProxy, err := core.CreateTorProxy(circuitInterval, txtlines[i])
-		if err != nil {
-			if torProxy != nil {
-				torProxy.Close()
-			}
-
-			return err
-		}
-
-		ch <- *torProxy
-
-		//		})
-	}
-	//return nil
-
-	err := g.Wait()
-	close(ch)
-
-	for proxy := range ch {
-		proxies = append(proxies, proxy)
-	}
-	defer core.CloseProxies(proxies)
-
-	if err != nil {
-		return err
-	}
-
-	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
-	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
-
-	proxies1 := make([]core.TorProxy, 0)
-
-	reverseProxy1 := &core.ReverseProxy{}
-	err = reverseProxy1.Start(proxies1, port)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func dash(port int, circuitInterval int, hslist string) error {
 
@@ -209,14 +145,3 @@ func dash(port int, circuitInterval int, hslist string) error {
 	defer core.CloseProxies1(proxies)
 	return err
 }
-
-/*
-func dash1(port int, circuitInterval int, hslist string) error {
-	reverseProxy1 := &core.ReverseProxy1{}
-	var proxies1 []int
-	proxies1 = []int{9002, 9008}
-	err := reverseProxy1.Start1(proxies1, port)
-
-	return err
-}
-*/

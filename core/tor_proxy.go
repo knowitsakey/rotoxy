@@ -33,73 +33,6 @@ type TorProxy1 struct {
 	//Onionproxy      *socks5.Server
 }
 
-func CreateTorProxy(circuitInterval int, hsaddr string) (*TorProxy, error) {
-	ctx := context.Background()
-
-	port, err := GetFreePort()
-	if err != nil {
-		return nil, err
-	}
-
-	var extraArgs []string
-	// Set socks port
-	extraArgs = append(extraArgs, "--SocksPort")
-	extraArgs = append(extraArgs, strconv.Itoa(port))
-
-	// Set new circuit interval after circuit was used once
-	extraArgs = append(extraArgs, "--MaxCircuitDirtiness")
-	extraArgs = append(extraArgs, strconv.Itoa(circuitInterval))
-
-	torCtx, err := tor.Start(ctx, &tor.StartConf{
-		ExtraArgs:       extraArgs,
-		NoAutoSocksPort: true,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	torProxy := &TorProxy{}
-	torProxy.Ctx = torCtx
-	torProxy.ProxyPort = &port
-	torProxy.ControlPort = &torCtx.ControlPort
-	torProxy.CircuitInterval = &circuitInterval
-	conf1 := &tor.DialConf{}
-	conf1.ProxyAddress = hsaddr
-	conf1.ProxyAddress = "fefix3iwkb5b3b2z2sicik7re2qsv2o5hrch7pyvuvifklou2fnblayd.onion:80"
-	conf1.Forward = proxy.Direct
-	// Make connection
-	_, err = torCtx.Dialer(ctx, conf1)
-	if err != nil {
-		return nil, err
-	}
-	//	torProxy.
-	return torProxy, nil
-}
-func checkError(err error) {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
-	}
-}
-
-func readFully(conn net.Conn) ([]byte, error) {
-	defer conn.Close()
-
-	result := bytes.NewBuffer(nil)
-	var buf [512]byte
-	for {
-		n, err := conn.Read(buf[0:])
-		result.Write(buf[0:n])
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-	}
-	return result.Bytes(), nil
-}
 func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*TorProxy1, error) {
 	ctx := context.Background()
 
@@ -194,11 +127,6 @@ func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*To
 	return torProxy1, nil
 }
 
-func (m *TorProxy) Close() {
-	if m.Ctx != nil {
-		m.Ctx.Close()
-	}
-}
 func (m *TorProxy1) Close1() {
 	if m.Ctx != nil {
 		m.Ctx.Close()
@@ -257,4 +185,29 @@ func (gate *TorGate) DialTor(address string) (net.Conn, error) {
 
 	return connect, nil
 
+}
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
+}
+
+func readFully(conn net.Conn) ([]byte, error) {
+	defer conn.Close()
+
+	result := bytes.NewBuffer(nil)
+	var buf [512]byte
+	for {
+		n, err := conn.Read(buf[0:])
+		result.Write(buf[0:n])
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+	}
+	return result.Bytes(), nil
 }
