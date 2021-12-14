@@ -127,6 +127,11 @@ func CreateTorProxy1(circuitInterval int, hsaddr string, wg sync.WaitGroup) (*To
 	return torProxy1, nil
 }
 
+func (m *TorProxy) Close() {
+	if m.Ctx != nil {
+		m.Ctx.Close()
+	}
+}
 func (m *TorProxy1) Close1() {
 	if m.Ctx != nil {
 		m.Ctx.Close()
