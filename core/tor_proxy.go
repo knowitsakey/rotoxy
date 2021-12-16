@@ -25,8 +25,8 @@ type TorProxy struct {
 
 type TorProxy1 struct {
 	Ctx             *tor.Tor
-	client          *ssh.Client
-	socks5s         *socks5.Server
+	Client          *ssh.Client
+	Socks5s         *socks5.Server
 	ControlPort     *int
 	ProxyPort       *int
 	CircuitInterval *int
@@ -34,12 +34,13 @@ type TorProxy1 struct {
 	//Onionproxy      *socks5.Server
 }
 
-func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
+func CreateTorProxy1(circuitInterval int, hsaddr string) (TorProxy1, error) {
+	torProxy1 := TorProxy1{}
 	ctx := context.Background()
 
 	port, err := GetFreePort()
 	if err != nil {
-		return nil, err
+		return torProxy1, err
 	}
 
 	var extraArgs []string
@@ -57,10 +58,9 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 		EnableNetwork: true,
 	})
 	if err != nil {
-		return nil, err
+		return torProxy1, err
 	}
 
-	torProxy1 := &TorProxy1{}
 	torProxy1.Ctx = torCtx
 	torProxy1.ProxyPort = &port
 	torProxy1.ControlPort = &torCtx.ControlPort
@@ -83,21 +83,21 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	tp, err := NewTorGate(conf1.ProxyAddress)
 
 	if err != nil {
-		return nil, err
+		return torProxy1, err
 	}
 	conn1, err := tp.DialTor(hsaddr + ":22")
 	//d, err := torCtx.Dialer(ctx, conf1)
 	//conn1, err := d.DialContext(ctx, "tcp", hsaddr)
 	if err != nil {
-		return nil, err
+		return torProxy1, err
 	}
 	c, chans, reqs, err := ssh.NewClientConn(conn1, conf1.ProxyAddress, sshConf)
 	if err != nil {
-		return nil, err
+		return torProxy1, err
 	}
 	//torProxy1.client, err := &ssh.NewClient(c, chans, reqs)
 	//client1 := &ssh.NewClient(c, chans, reqs
-	torProxy1.client = ssh.NewClient(c, chans, reqs)
+	torProxy1.Client = ssh.NewClient(c, chans, reqs)
 	//client1 := ssh.NewClient(c, chans, reqs)
 	fmt.Println("Connected to .onion successfully!")
 
@@ -107,23 +107,23 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	fmt.Println("we trine kreate socks serva at"+socks5Address, err)
 	conf := &socks5.Config{
 		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return torProxy1.client.Dial(network, addr)
+			return torProxy1.Client.Dial(network, addr)
 		},
 	}
 
-	torProxy1.socks5s, err = socks5.New(conf)
+	torProxy1.Socks5s, err = socks5.New(conf)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return torProxy1, err
 	}
 
-	if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
-		fmt.Println("failed to create socks5 server", err)
-	}
-	fmt.Println("kreated u a socks serva at "+socks5Address, err)
+	//if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
+	//	fmt.Println("failed to create socks5 server", err)
+	//}
+	//fmt.Println("kreated u a socks serva at "+socks5Address, err)
 
 	if err != nil {
-		return nil, err
+		return torProxy1, err
 	}
 	//	torProxy.
 	return torProxy1, nil
