@@ -34,13 +34,13 @@ type TorProxy1 struct {
 	//Onionproxy      *socks5.Server
 }
 
-func CreateTorProxy1(circuitInterval int, hsaddr string) (TorProxy1, error) {
-	torProxy1 := TorProxy1{}
+func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
+	torProxy1 := &TorProxy1{}
 	ctx := context.Background()
 
 	port, err := GetFreePort()
 	if err != nil {
-		return torProxy1, err
+		return nil, err
 	}
 
 	var extraArgs []string
@@ -58,7 +58,7 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (TorProxy1, error) {
 		EnableNetwork: true,
 	})
 	if err != nil {
-		return torProxy1, err
+		return nil, err
 	}
 
 	torProxy1.Ctx = torCtx
@@ -83,17 +83,17 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (TorProxy1, error) {
 	tp, err := NewTorGate(conf1.ProxyAddress)
 
 	if err != nil {
-		return torProxy1, err
+		return nil, err
 	}
 	conn1, err := tp.DialTor(hsaddr + ":22")
 	//d, err := torCtx.Dialer(ctx, conf1)
 	//conn1, err := d.DialContext(ctx, "tcp", hsaddr)
 	if err != nil {
-		return torProxy1, err
+		return nil, err
 	}
 	c, chans, reqs, err := ssh.NewClientConn(conn1, conf1.ProxyAddress, sshConf)
 	if err != nil {
-		return torProxy1, err
+		return nil, err
 	}
 	//torProxy1.client, err := &ssh.NewClient(c, chans, reqs)
 	//client1 := &ssh.NewClient(c, chans, reqs
@@ -114,7 +114,7 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (TorProxy1, error) {
 	torProxy1.Socks5s, err = socks5.New(conf)
 	if err != nil {
 		fmt.Println(err)
-		return torProxy1, err
+		return nil, err
 	}
 
 	//if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
@@ -123,7 +123,7 @@ func CreateTorProxy1(circuitInterval int, hsaddr string) (TorProxy1, error) {
 	//fmt.Println("kreated u a socks serva at "+socks5Address, err)
 
 	if err != nil {
-		return torProxy1, err
+		return nil, err
 	}
 	//	torProxy.
 	return torProxy1, nil
@@ -184,7 +184,7 @@ func (gate *TorGate) DialTor(address string) (net.Conn, error) {
 		return nil, errors.New("Could not connect to TOR_GATE_: " + err.Error())
 	}
 
-	connect, err := dialer.Dial("tcp4", address)
+	connect, err := dialer.Dial("tcp", address)
 
 	if err != nil {
 		return nil, errors.New("Failed to connect: " + err.Error())

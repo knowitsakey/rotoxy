@@ -88,7 +88,7 @@ func dash(port int, circuitInterval int, hslist string) error {
 
 	log.Println(fmt.Sprintf("Starting tor proxies"))
 
-	proxies := make([]core.TorProxy1, numberTorInstances)
+	proxies := make([]*core.TorProxy1, numberTorInstances)
 	//ch := make(chan core.TorProxy1, numberTorInstances)
 	//var proxyports []int
 	//proxies1 = []int{9002, 9008}
@@ -102,6 +102,8 @@ func dash(port int, circuitInterval int, hslist string) error {
 	//wg.Add(numberTorInstances - 1)
 	var err error
 	for i := 0; i < numberTorInstances; i++ {
+		//var torProxy *core.TorProxy1
+		//torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
 		proxies[i], err = core.CreateTorProxy1(circuitInterval, txtlines[i])
 	}
 	/*
@@ -148,21 +150,28 @@ func dash(port int, circuitInterval int, hslist string) error {
 	//wg1.Wait()
 	fmt.Println(err)
 	wg2 := new(sync.WaitGroup)
-	wg2.Add(numberTorInstances - 1)
-	for i := 0; i < len(proxies)-1; i++ {
-		go func() {
-			socks5Address := "127.0.0.1:" + strconv.Itoa(*proxies[i].DoubleProxyPort)
-			err := proxies[i].Socks5s.ListenAndServe("tcp", socks5Address)
-			if err != nil {
-				fmt.Println("failed to create socks5 server", err)
-				//return err
-				return
-			}
-			fmt.Println("kreated u a socks serva at "+socks5Address, err)
+	wg2.Add(numberTorInstances)
 
-			//wg2.Done()
-			return
-		}()
+	for i := 0; i < len(proxies); i++ {
+		//go func() {
+		if proxies[i] != nil {
+			go func() {
+
+				socks5Address := "127.0.0.1:" + strconv.Itoa(*proxies[i].DoubleProxyPort)
+				fmt.Println("we trine kreate socks serva at"+socks5Address, err)
+				err := proxies[i].Socks5s.ListenAndServe("tcp", socks5Address)
+				if err != nil {
+					fmt.Println("failed to create socks5 server", err)
+					//return err
+					//return
+				}
+				fmt.Println("kreated u a socks serva at "+socks5Address, err)
+				wg2.Done()
+			}()
+		}
+		//wg2.Done()
+		//return
+		//}()
 	}
 	wg2.Wait()
 
