@@ -26,16 +26,16 @@ type upstreamDialer struct {
 	forwardDialers []socks.Dialer
 }
 
-func (m *ReverseProxy1) Start2(proxies []TorProxy1, port int) error {
+func (m *ReverseProxy1) Start2(proxies *[]TorProxy1, port int) error {
 	m.port = &port
-	m.upstreamProxies = &proxies
+	m.upstreamProxies = proxies
 
 	var router socks.Dialer
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Tr.DisableKeepAlives = true
 
 	proxyUrls := make([]string, 0)
-	for _, proxy := range proxies {
+	for _, proxy := range *proxies {
 		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", *proxy.ProxyPort))
 	}
 

@@ -2,8 +2,6 @@ package main
 
 import (
 	"bufio"
-	"sync"
-
 	//"context"
 	"fmt"
 	"github.com/gtuk/rotating-tor-proxy/core"
@@ -102,8 +100,7 @@ func dash(port int, circuitInterval int, hslist string) error {
 	//wg.Add(numberTorInstances - 1)
 	var err error
 	for i := 0; i < numberTorInstances; i++ {
-		//var torProxy *core.TorProxy1
-		//torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
+		//proxies[i], err = core.CreateSimpleSshProxy(circuitInterval, txtlines[i])
 		proxies[i], err = core.CreateTorProxy1(circuitInterval, txtlines[i])
 	}
 	/*
@@ -148,32 +145,39 @@ func dash(port int, circuitInterval int, hslist string) error {
 		}*/
 
 	//wg1.Wait()
+	//	port int
+	//for i := 0; i < len(proxies); i++ {
+	//	proxies[i].Client.Dial("tcp", "127.0.0.1:80")
+	//	//port := proxies[i].DoubleProxyPort
+	//	fmt.Println(port)
+	//}
+
 	fmt.Println(err)
-	wg2 := new(sync.WaitGroup)
-	wg2.Add(numberTorInstances)
+	//wg2 := new(sync.WaitGroup)
+	//wg2.Add(numberTorInstances)
 
 	for i := 0; i < len(proxies); i++ {
 		//go func() {
 		if proxies[i] != nil {
-			go func() {
+			//go func() {
 
-				socks5Address := "127.0.0.1:" + strconv.Itoa(*proxies[i].DoubleProxyPort)
-				fmt.Println("we trine kreate socks serva at"+socks5Address, err)
-				err := proxies[i].Socks5s.ListenAndServe("tcp", socks5Address)
-				if err != nil {
-					fmt.Println("failed to create socks5 server", err)
-					//return err
-					//return
-				}
-				fmt.Println("kreated u a socks serva at "+socks5Address, err)
-				wg2.Done()
-			}()
+			socks5Address := "127.0.0.1:" + strconv.Itoa(*proxies[i].DoubleProxyPort)
+			fmt.Println("we trine kreate socks serva at "+socks5Address, err)
+			go proxies[i].Socks5s.ListenAndServe("tcp", socks5Address)
+			if err != nil {
+				fmt.Println("failed to create socks5 server", err)
+				//return err
+				//return
+			}
+			fmt.Println("kreated u a socks serva at "+socks5Address, err)
+			//			wg2.Done()
+			//		}()
 		}
 		//wg2.Done()
 		//return
 		//}()
 	}
-	wg2.Wait()
+	//wg2.Wait()
 
 	//return nil
 	/*	if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
@@ -196,10 +200,10 @@ func dash(port int, circuitInterval int, hslist string) error {
 
 	//reverseProxy1 := &core.ReverseProxy1{}
 	//
-	//err := reverseProxy1.Start2(proxies, port)
-	//if err != nil {
-	//	return err
-	//}
+	//err = reverseProxy1.Start2(proxies, port)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

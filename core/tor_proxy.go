@@ -34,6 +34,80 @@ type TorProxy1 struct {
 	//Onionproxy      *socks5.Server
 }
 
+func CreateSimpleSshProxy(circuitinterval int, hsaddr string) (*TorProxy1, error) {
+
+	var err error
+	torProxy1 := &TorProxy1{}
+	//ctx := context.Background()
+	//torCtx, err := tor.Start(ctx, &tor.StartConf{
+	//	ExtraArgs: extraArgs,
+	//	//NoAutoSocksPort: true,
+	//	EnableNetwork: true,
+	//})
+	socks5Address := "127.0.0.1:22"
+
+	sshConf := &ssh.ClientConfig{
+		User:            "based",
+		Auth:            []ssh.AuthMethod{ssh.Password("lab")},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	//tp, err := NewTorGate(conf1.ProxyAddress)
+
+	if err != nil {
+		return nil, err
+	}
+	//conn1, err := tp.DialTor(hsaddr + ":22")
+	torProxy1.Client, err = ssh.Dial("tcp", "127.0.0.1:22", sshConf)
+	if err != nil {
+		return nil, err
+	}
+
+	//d, err := torCtx.Dialer(ctx, conf1)
+	//conn1, err := d.DialContext(ctx, "tcp", hsaddr)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//c, chans, reqs, err := ssh.NewClientConn(conn1, "127.0.0.1:22", sshConf)
+	//if err != nil {
+	//	return nil, err
+	//}
+	////torProxy1.client, err := &ssh.NewClient(c, chans, reqs)
+	////client1 := &ssh.NewClient(c, chans, reqs
+	//torProxy1.Client = ssh.NewClient(c, chans, reqs)
+	////client1 := ssh.NewClient(c, chans, reqs)
+	//fmt.Println("Connected to .onion successfully!")
+	//
+	//defer client1.Close()
+
+	fmt.Println("connected to ssh server")
+	fmt.Println("we trine kreate socks serva at"+socks5Address, err)
+	conf := &socks5.Config{
+		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return torProxy1.Client.Dial(network, addr)
+		},
+	}
+
+	torProxy1.Socks5s, err = socks5.New(conf)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	port, err := GetFreePort()
+	torProxy1.DoubleProxyPort = &port
+	//if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
+	//	fmt.Println("failed to create socks5 server", err)
+	//}
+	//fmt.Println("kreated u a socks serva at "+socks5Address, err)
+
+	if err != nil {
+		return nil, err
+	}
+	//	torProxy.
+	return torProxy1, nil
+
+}
+
 func CreateTorProxy1(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 	torProxy1 := &TorProxy1{}
 	ctx := context.Background()
