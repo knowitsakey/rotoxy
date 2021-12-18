@@ -19,14 +19,14 @@ type ReverseProxy struct {
 type ReverseProxy1 struct {
 	port            *int
 	proxy           *goproxy.ProxyHttpServer
-	upstreamProxies *[]TorProxy1
+	upstreamProxies []*TorProxy1
 }
 
 type upstreamDialer struct {
 	forwardDialers []socks.Dialer
 }
 
-func (m *ReverseProxy1) Start2(proxies *[]TorProxy1, port int) error {
+func (m *ReverseProxy1) Start1(proxies []*TorProxy1, port int) error {
 	m.port = &port
 	m.upstreamProxies = proxies
 
@@ -35,8 +35,8 @@ func (m *ReverseProxy1) Start2(proxies *[]TorProxy1, port int) error {
 	proxy.Tr.DisableKeepAlives = true
 
 	proxyUrls := make([]string, 0)
-	for _, proxy := range *proxies {
-		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", *proxy.ProxyPort))
+	for _, proxy := range proxies {
+		proxyUrls = append(proxyUrls, fmt.Sprintf("127.0.0.1:%d", *proxy.DoubleProxyPort))
 	}
 
 	router, err := buildUpstreamRouter(proxyUrls)

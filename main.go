@@ -2,6 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
+	"io"
+	"net"
+	"time"
+
 	//"context"
 	"fmt"
 	"github.com/gtuk/rotating-tor-proxy/core"
@@ -80,82 +86,60 @@ func readtodict(filename string, txtlines *[]string) {
 
 func dash(port int, circuitInterval int, hslist string) error {
 
-	var txtlines []string
-	readtodict(hslist, &txtlines)
-	numberTorInstances := len(txtlines)
+	var textlines []string
+	readtodict(hslist, &textlines)
+	numberTorInstances := len(textlines)
 
 	log.Println(fmt.Sprintf("Starting tor proxies"))
 
 	proxies := make([]*core.TorProxy1, numberTorInstances)
-	//ch := make(chan core.TorProxy1, numberTorInstances)
-	//var proxyports []int
-	//proxies1 = []int{9002, 9008}
 
-	//g, _ := errgroup.WithContext(context.Background())
-
-	for _, eachline := range txtlines {
+	for _, eachline := range textlines {
 		fmt.Println(eachline)
 	}
 	//wg := new(sync.WaitGroup)
 	//wg.Add(numberTorInstances - 1)
 	var err error
 	for i := 0; i < numberTorInstances; i++ {
-		//proxies[i], err = core.CreateSimpleSshProxy(circuitInterval, txtlines[i])
-		proxies[i], err = core.CreateTorProxy1(circuitInterval, txtlines[i])
+		//proxies[i], err = core.CreateSimpleSshProxy(circuitInterval, textlines[i])
+		proxies[i], err = core.CreateTorProxy2(circuitInterval, textlines[i])
 	}
-	/*
-		for i := 0; i < numberTorInstances-1; i++ {
-			//i := 1
-			//for _, hsaddr := range txtlines {
-			//go func(i int) {
-			//g.Go(func() error {
-			fmt.Println("Starting proxy number " + strconv.Itoa(i) + " at " + txtlines[i])
-			torProxy, err := core.CreateTorProxy1(circuitInterval, txtlines[i])
-			if err != nil {
-				if torProxy != nil {
-					torProxy.Close1()
-				}
-				fmt.Println("ERRORRR")
-				//return
-			}
-			//port1 := torProxy.DoubleProxyPort
-			//proxyports = append(proxyports, *port1)
-			//torProxy.socks5s.ListenAndServe("tcp", socks5Address)
-			proxies[i] = *torProxy
-			//proxies = append(proxies, *torProxy)
+	DoubleProxies := make([]*core.SshProxy, numberTorInstances)
 
-			//ch <- *torProxy
-			//fmt.Println("ERRORRR")
-			//	return
-			//	wg.Done()
+	for i := 0; i < numberTorInstances; i++ {
+		DoubleProxies[i], err = core.CreateSshProxy(textlines[i], proxies[i])
 
-			//}(i)
-			//})
-		}
-	*/
-	//wg.Wait()
-	//err := g.Wait()
-
-	//wg1 := new(sync.WaitGroup)
-	//wg1.Add(numberTorInstances)
-	/*	close(ch)
-		for proxy := range ch {
-			proxies = append(proxies, proxy)
-			//wg1.Done()
-		}*/
-
-	//wg1.Wait()
-	//	port int
-	//for i := 0; i < len(proxies); i++ {
-	//	proxies[i].Client.Dial("tcp", "127.0.0.1:80")
-	//	//port := proxies[i].DoubleProxyPort
-	//	fmt.Println(port)
-	//}
+	}
 
 	fmt.Println(err)
-	//wg2 := new(sync.WaitGroup)
-	//wg2.Add(numberTorInstances)
+	//startServers(proxies)
+	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
+	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
 
+	reverseProxy1 := &core.ReverseProxy1{}
+
+	err = reverseProxy1.Start1(proxies, port)
+
+	if err != nil {
+		return err
+	}
+
+	//defer core.CloseProxies1(proxies)
+	return nil
+}
+
+//i user, hidden service, ssh private key, torsocks5port, doubleproxyport,
+//r nothing
+//m
+//e test 2 see if it works n give us a socks5 proxy.
+//execute command launching darkssh in a new process
+
+func start2ndProxy() {
+
+}
+
+func startServers(proxies []*core.TorProxy1) {
+	var err error
 	for i := 0; i < len(proxies); i++ {
 		//go func() {
 		if proxies[i] != nil {
@@ -163,7 +147,12 @@ func dash(port int, circuitInterval int, hslist string) error {
 
 			socks5Address := "127.0.0.1:" + strconv.Itoa(*proxies[i].DoubleProxyPort)
 			fmt.Println("we trine kreate socks serva at "+socks5Address, err)
-			go proxies[i].Socks5s.ListenAndServe("tcp", socks5Address)
+			go func() {
+				err := proxies[i].Socks5s.ListenAndServe("tcp", socks5Address)
+				if err != nil {
+					fmt.Println("failed to create socks5 server", err)
+				}
+			}()
 			if err != nil {
 				fmt.Println("failed to create socks5 server", err)
 				//return err
@@ -173,37 +162,75 @@ func dash(port int, circuitInterval int, hslist string) error {
 			//			wg2.Done()
 			//		}()
 		}
-		//wg2.Done()
-		//return
-		//}()
+
 	}
-	//wg2.Wait()
+}
 
-	//return nil
-	/*	if err := torProxy1.socks5s.ListenAndServe("tcp", socks5Address); err != nil {
-			fmt.Println("failed to create socks5 server", err)
-		}
-		fmt.Println("kreated u a socks serva at "+socks5Address, err)
+func testSocks5(port int) {
 
-		if err != nil {
-			return nil, err
-		}*/
+	const (
+		NoAuth          = uint8(0)
+		noAcceptable    = uint8(255)
+		UserPassAuth    = uint8(2)
+		userAuthVersion = uint8(1)
+		authSuccess     = uint8(0)
+		authFailure     = uint8(1)
+		socks5Version   = uint8(5)
+	)
 
-	//	defer core.CloseProxies1(proxies)
-
-	//if err != nil {
-	//	return err
-	//}
-
-	log.Println(fmt.Sprintf("Started %d tor proxies", len(proxies)))
-	log.Println(fmt.Sprintf("Start reverse proxy on port %d", port))
-
-	//reverseProxy1 := &core.ReverseProxy1{}
-	//
-	//err = reverseProxy1.Start2(proxies, port)
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return err
+
+	}
+	lAddr := l.Addr().(*net.TCPAddr)
+
+	socks5Address := "127.0.0.1:" + strconv.Itoa(port)
+	// Get a local conn
+	conn, err := net.Dial("tcp", socks5Address)
+	if err != nil {
+		log.Println(conn)
+	}
+	req := bytes.NewBuffer(nil)
+	req.Write([]byte{5})
+	req.Write([]byte{2, NoAuth, UserPassAuth})
+	req.Write([]byte{1, 3, 'f', 'o', 'o', 3, 'b', 'a', 'r'})
+	req.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
+
+	port1 := []byte{0, 0}
+	binary.BigEndian.PutUint16(port1, uint16(lAddr.Port))
+	req.Write(port1)
+
+	// Send a ping
+	req.Write([]byte("ping"))
+
+	// Send all the bytes
+	conn.Write(req.Bytes())
+
+	// Verify response
+	expected := []byte{
+		socks5Version, UserPassAuth,
+		1, authSuccess,
+		5,
+		0,
+		0,
+		1,
+		127, 0, 0, 1,
+		0, 0,
+		'p', 'o', 'n', 'g',
+	}
+	out := make([]byte, len(expected))
+
+	conn.SetDeadline(time.Now().Add(time.Second))
+	if _, err := io.ReadAtLeast(conn, out, len(out)); err != nil {
+		fmt.Println(err)
 	}
 
-	return nil
+	// Ignore the port
+	out[12] = 0
+	out[13] = 0
+
+	if !bytes.Equal(out, expected) {
+		fmt.Println(err)
+	}
+
 }
