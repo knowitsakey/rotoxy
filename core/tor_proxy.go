@@ -194,6 +194,7 @@ func CreateTorProxy2(circuitInterval int, hsaddr string) (*TorProxy1, error) {
 
 	torCtx, err := tor.Start(ctx, &tor.StartConf{
 		ExtraArgs: extraArgs,
+		//TorrcFile: "torrc",
 		//NoAutoSocksPort: true,
 		EnableNetwork: true,
 	})
