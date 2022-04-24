@@ -1,19 +1,25 @@
 # Rotoxy
 
-A rotating tor proxy service that starts a configurable number of tor socks proxies and expose them under one reverse proxy (http).
-The tor socks proxies are randomly selected by the reverse proxy
+A rotating tor proxy service that leverages darkssh to start a number of connections to tor hidden services, exposing them under a single proxy. Ideal usage is putting tor traffic through a web browser using proxychains.
+The purpose of this project is to evade web traffic fingerprinting attacks at the client.
+http => proxychains => ssh client => tor => ssh server => vpn client => vpn server
+
+Note: this project is experimental, use at your own risk.
+
+the vpn at the other end can be set up using the following iptables rules: 
+
+
 
 ### Prerequisites
 In order to use the tool you need have Tor installed on the machine
 
 ### Usage
 Download the latest release from github
+open three terminals, set http	127.0.0.1 8080 in proxychains.conf
+terminal1: ./rotating-tor-proxy
+terminal2: ./proxychains4-daemon
+terminal3: ./proxychains4 -f /home/based/proxychains-ng/src/proxychains.conf firefox
 
-```bash
-./rotoxy --help # Show usage
-./rotoxy # Run with default parameters
-./rotoxy --tors 1 --port 8080 --circuitInterval 30 # Run with custom parameters
-```
 ### Docker
 ```bash
 docker run -p 8080:8080 gtuk/rotoxy:latest # Run with default parameters
