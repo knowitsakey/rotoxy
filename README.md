@@ -16,7 +16,9 @@ In order to use the tool you need have Tor installed on the machine
 
 ### Usage
 Download the latest release from github
-open three terminals, set http	127.0.0.1 8080 in proxychains.conf
+open three terminals, set 
+[ProxyList]
+http 127.0.0.1 8080 in proxychains.conf
 ```bash
 ./rotating-tor-proxy
 ./proxychains4-daemon
